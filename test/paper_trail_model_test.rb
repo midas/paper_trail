@@ -59,6 +59,27 @@ class HasPaperTrailModelTest < Test::Unit::TestCase
       should_change('the number of versions', :by => 1) { Version.count }
     end
   end
+  
+  context 'An updated record' do
+    setup do
+      Version.delete_all
+      @book = Book.create!( :title => 'The Rails Way' )
+      @original_id = @book.id
+      @book.update_attributes!( :title => 'The Ruby Way' )
+    end
+    
+    should "serialize all attributes of the old version correctly" do
+      versions = Version.find_all_by_item_id( @original_id )
+      old_attributes = YAML.load( versions.last.object ).symbolize_keys
+      expected_old_attributes = { :id => @original_id, :title => 'The Rails Way' }
+      assert_equal expected_old_attributes, old_attributes
+    end
+    
+    should "save the new object with its updated attributes correctly" do
+      new_book = Book.find( @original_id )
+      assert_equal 'The Ruby Way', new_book.title
+    end
+  end
 
 
   context 'A new record' do

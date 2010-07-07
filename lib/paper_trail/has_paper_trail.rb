@@ -119,10 +119,12 @@ module PaperTrail
         # Second we merge any extra data from the controller (if available).
         data.merge(PaperTrail.controller_info || {})
       end
-
+      
       def item_before_change
-        previous = self.clone
-        previous.id = id
+        previous = self.class.new
+        attributes.except( changes.keys ).each do |attr, val|
+          previous.send "#{attr}=", val
+        end
         changes.each do |attr, ary|
           previous.send "#{attr}=", ary.first
         end
