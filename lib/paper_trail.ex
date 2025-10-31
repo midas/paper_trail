@@ -11,15 +11,16 @@ defmodule PaperTrail do
   defdelegate get_versions(record), to: PaperTrail.VersionQueries
   defdelegate get_versions(model_or_record, id_or_options), to: PaperTrail.VersionQueries
   defdelegate get_versions(model, id, options), to: PaperTrail.VersionQueries
-  defdelegate get_current_model(version), to: PaperTrail.VersionQueries
+  defdelegate get_current_model(version, options \\ []), to: PaperTrail.VersionQueries
   defdelegate make_version_struct(version, model, options), to: Serializer
   defdelegate serialize(data), to: Serializer
-  defdelegate get_sequence_id(table_name), to: Serializer
+  defdelegate get_sequence_id(table_name, options \\ []), to: Serializer
   defdelegate add_prefix(schema, prefix), to: Serializer
   defdelegate get_item_type(data), to: Serializer
   defdelegate get_model_id(model), to: Serializer
 
   @default_transaction_options [
+    repo: nil,
     origin: nil,
     meta: nil,
     originator: nil,
@@ -34,13 +35,15 @@ defmodule PaperTrail do
   """
   def initialise(
         model,
-        options \\ [origin: nil, meta: nil, originator: nil, prefix: nil, version_key: :version]
+        options \\ [repo: nil, origin: nil, meta: nil, originator: nil, prefix: nil, version_key: :version]
       ) do
-    case has_version?(model) do
+    repo = PaperTrail.RepoClient.repo(options)
+
+    case has_version?(model, options) do
       false ->
         with {:ok, _} <-
                make_version_struct(%{event: "insert"}, model, options)
-               |> PaperTrail.RepoClient.repo().insert() do
+               |> repo.insert() do
           :ok
         end
 
@@ -62,7 +65,7 @@ defmodule PaperTrail do
   def insert(changeset, options \\ @default_transaction_options) do
     PaperTrail.Multi.new()
     |> PaperTrail.Multi.insert(changeset, options)
-    |> PaperTrail.Multi.commit()
+    |> PaperTrail.Multi.commit(options)
   end
 
   @doc """
@@ -85,7 +88,7 @@ defmodule PaperTrail do
   def insert_or_update(changeset, options \\ @default_transaction_options) do
     PaperTrail.Multi.new()
     |> PaperTrail.Multi.insert_or_update(changeset, options)
-    |> PaperTrail.Multi.commit()
+    |> PaperTrail.Multi.commit(options)
   end
 
   @doc """
@@ -108,7 +111,7 @@ defmodule PaperTrail do
   def update(changeset, options \\ @default_transaction_options) do
     PaperTrail.Multi.new()
     |> PaperTrail.Multi.update(changeset, options)
-    |> PaperTrail.Multi.commit()
+    |> PaperTrail.Multi.commit(options)
   end
 
   @doc """
@@ -131,7 +134,7 @@ defmodule PaperTrail do
   def delete(model_or_changeset, options \\ @default_transaction_options) do
     PaperTrail.Multi.new()
     |> PaperTrail.Multi.delete(model_or_changeset, options)
-    |> PaperTrail.Multi.commit()
+    |> PaperTrail.Multi.commit(options)
   end
 
   @doc """

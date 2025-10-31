@@ -17,12 +17,13 @@ defmodule PaperTrail.Multi do
   defdelegate to_list(multi), to: Ecto.Multi
   defdelegate make_version_struct(version, model, options), to: Serializer
   defdelegate serialize(data), to: Serializer
-  defdelegate get_sequence_id(table_name), to: Serializer
+  defdelegate get_sequence_id(table_name, options \\ []), to: Serializer
   defdelegate add_prefix(schema, prefix), to: Serializer
   defdelegate get_item_type(data), to: Serializer
   defdelegate get_model_id(model), to: Serializer
 
   @default_transaction_options [
+    repo: nil,
     origin: nil,
     meta: nil,
     originator: nil,
@@ -39,16 +40,16 @@ defmodule PaperTrail.Multi do
     initial_version_key = options[:initial_version_key] || :initial_version
     ecto_options = options[:ecto_options] || []
 
-    case RepoClient.strict_mode() do
+    case RepoClient.strict_mode(options) do
       true ->
         multi
         |> Ecto.Multi.run(initial_version_key, fn repo, %{} ->
-          version_id = get_sequence_id("versions") + 1
+          version_id = get_sequence_id("versions", options) + 1
 
           changeset_data =
             Map.get(changeset, :data, changeset)
             |> Map.merge(%{
-              id: get_sequence_id(changeset) + 1,
+              id: get_sequence_id(changeset, options) + 1,
               first_version_id: version_id,
               current_version_id: version_id
             })
@@ -108,14 +109,14 @@ defmodule PaperTrail.Multi do
     initial_version_key = options[:initial_version_key] || :initial_version
     ecto_options = options[:ecto_options] || []
 
-    case RepoClient.strict_mode() do
+    case RepoClient.strict_mode(options) do
       true ->
         multi
         |> Ecto.Multi.run(initial_version_key, fn repo, %{} ->
           version_data =
             changeset.data
             |> Map.merge(%{
-              current_version_id: get_sequence_id("versions")
+              current_version_id: get_sequence_id("versions", options)
             })
 
           target_changeset = changeset |> Map.merge(%{data: version_data})
@@ -178,12 +179,12 @@ defmodule PaperTrail.Multi do
     end)
   end
 
-  def commit(%Ecto.Multi{} = multi) do
-    repo = RepoClient.repo()
+  def commit(%Ecto.Multi{} = multi, options \\ []) do
+    repo = RepoClient.repo(options)
 
     transaction = repo.transaction(multi)
 
-    case RepoClient.strict_mode() do
+    case RepoClient.strict_mode(options) do
       true ->
         case transaction do
           {:error, _, changeset, %{}} ->

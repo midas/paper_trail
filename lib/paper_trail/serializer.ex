@@ -80,19 +80,22 @@ defmodule PaperTrail.Serializer do
   @doc """
   Returns the last primary key value of a table
   """
-  @spec get_sequence_id(model() | String.t()) :: primary_key()
-  def get_sequence_id(%Ecto.Changeset{data: data}) do
-    get_sequence_id(data)
+  @spec get_sequence_id(model() | String.t(), options()) :: primary_key()
+  def get_sequence_id(data, options \\ [])
+
+  def get_sequence_id(%Ecto.Changeset{data: data}, options) do
+    get_sequence_id(data, options)
   end
 
-  def get_sequence_id(%schema{}) do
+  def get_sequence_id(%schema{}, options) do
     :source
     |> schema.__schema__()
-    |> get_sequence_id()
+    |> get_sequence_id(options)
   end
 
-  def get_sequence_id(table_name) when is_binary(table_name) do
-    Ecto.Adapters.SQL.query!(RepoClient.repo(), "select last_value FROM #{table_name}_id_seq").rows
+  def get_sequence_id(table_name, options) when is_binary(table_name) do
+    repo = RepoClient.repo(options)
+    Ecto.Adapters.SQL.query!(repo, "select last_value FROM #{table_name}_id_seq").rows
     |> List.first()
     |> List.first()
   end

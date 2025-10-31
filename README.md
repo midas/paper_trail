@@ -409,6 +409,60 @@ PaperTrail.Version.last() # returns the last version in the db by inserted_at
 #   item_id: 1, item_type: "Post", originator_id: nil, originator: nil, meta: nil}
 ```
 
+## Working with multiple repos (Umbrella applications)
+
+PaperTrail supports using multiple Ecto repos, which is especially useful in umbrella applications where different apps may have their own repos.
+
+You can specify which repo to use by passing the `:repo` option to any PaperTrail function:
+
+```elixir
+# Use a specific repo for this operation
+changeset = Post.changeset(%Post{}, %{title: "Hello", content: "World"})
+PaperTrail.insert(changeset, repo: MyApp.Repo)
+
+# Use a different repo for another operation
+other_changeset = User.changeset(%User{}, %{name: "John"})
+PaperTrail.insert(other_changeset, repo: OtherApp.Repo)
+
+# Query versions from a specific repo
+PaperTrail.get_versions(post, repo: MyApp.Repo)
+PaperTrail.get_version(user, repo: OtherApp.Repo)
+```
+
+If no `:repo` option is provided, PaperTrail falls back to the repo configured in your `config.exs`:
+
+```elixir
+# In your config/config.exs
+config :paper_trail, repo: YourApplicationName.Repo
+```
+
+This feature works with all PaperTrail functions:
+- `PaperTrail.insert/2`, `PaperTrail.insert!/2`
+- `PaperTrail.update/2`, `PaperTrail.update!/2`
+- `PaperTrail.delete/2`, `PaperTrail.delete!/2`
+- `PaperTrail.insert_or_update/2`, `PaperTrail.insert_or_update!/2`
+- `PaperTrail.get_versions/2`, `PaperTrail.get_versions/3`
+- `PaperTrail.get_version/2`, `PaperTrail.get_version/3`
+- `PaperTrail.has_version?/2`, `PaperTrail.has_version?/3`
+- `PaperTrail.get_current_model/2`
+
+### Umbrella Application Example
+
+```elixir
+# In an umbrella app with multiple repos
+defmodule MyUmbrella.MainApp.Repo do
+  use Ecto.Repo, otp_app: :main_app, adapter: Ecto.Adapters.Postgres
+end
+
+defmodule MyUmbrella.AnalyticsApp.Repo do
+  use Ecto.Repo, otp_app: :analytics_app, adapter: Ecto.Adapters.Postgres
+end
+
+# Use different repos for different operations
+{:ok, result} = PaperTrail.insert(main_changeset, repo: MyUmbrella.MainApp.Repo)
+{:ok, analytics_result} = PaperTrail.insert(analytics_changeset, repo: MyUmbrella.AnalyticsApp.Repo)
+```
+
 ## Working with multi tenancy
 
 Sometimes you have to deal with applications where you need multi tenancy capabilities,
@@ -459,6 +513,25 @@ tenant = "tenant_id"
 id = 1
 
 PaperTrail.get_versions(User, id, [prefix: tenant])
+```
+
+### Combining `:repo` and `:prefix` options
+
+You can combine the `:repo` and `:prefix` options for complete flexibility in umbrella applications with multi-tenancy:
+
+```elixir
+tenant = "tenant_id"
+
+changeset =
+  User.changeset(%User{}, %{first_name: "Izel", last_name: "Nakri"})
+  |> Ecto.Queryable.to_query()
+  |> Map.put(:prefix, tenant)
+
+# Use a specific repo AND a specific tenant schema
+PaperTrail.insert(changeset, repo: MyApp.Repo, prefix: tenant)
+
+# Query versions with both options
+PaperTrail.get_versions(User, id, repo: MyApp.Repo, prefix: tenant)
 ```
 
 ## Version timestamps

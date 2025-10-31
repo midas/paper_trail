@@ -27,16 +27,18 @@ defmodule PaperTrail.VersionQueries do
 
   @spec get_versions(record :: Ecto.Schema.t(), options :: keyword | []) :: [Version.t()]
   def get_versions(record, options) when is_map(record) do
+    repo = PaperTrail.RepoClient.repo(options)
     item_type = record.__struct__ |> Module.split() |> List.last()
 
     version_query(item_type, PaperTrail.get_model_id(record), options)
-    |> PaperTrail.RepoClient.repo().all
+    |> repo.all
   end
 
   @spec get_versions(model :: module, id :: pos_integer, options :: keyword | []) :: [Version.t()]
   def get_versions(model, id, options) do
+    repo = PaperTrail.RepoClient.repo(options)
     item_type = model |> Module.split() |> List.last()
-    version_query(item_type, id, options) |> PaperTrail.RepoClient.repo().all
+    version_query(item_type, id, options) |> repo.all
   end
 
   @doc """
@@ -67,8 +69,9 @@ defmodule PaperTrail.VersionQueries do
   @spec get_version(model :: module, id :: pos_integer, options :: keyword | []) ::
           Version.t() | nil
   def get_version(model, id, options) do
+    repo = PaperTrail.RepoClient.repo(options)
     last(version_query(model, id, options))
-    |> PaperTrail.RepoClient.repo().one
+    |> repo.one
   end
 
   @spec has_version?(record :: Ecto.Schema.t()) :: boolean
@@ -85,16 +88,18 @@ defmodule PaperTrail.VersionQueries do
 
   @spec has_version?(model :: module, id :: pos_integer, options :: keyword | []) :: boolean
   def has_version?(model, id, options) do
+    repo = PaperTrail.RepoClient.repo(options)
     version_query(model, id, options)
-    |> PaperTrail.RepoClient.repo().exists?()
+    |> repo.exists?()
   end
 
   @doc """
   Gets the current model record/struct of a version
   """
-  @spec get_current_model(version :: Version.t()) :: Ecto.Schema.t() | nil
-  def get_current_model(version) do
-    PaperTrail.RepoClient.repo().get(
+  @spec get_current_model(version :: Version.t(), options :: keyword | []) :: Ecto.Schema.t() | nil
+  def get_current_model(version, options \\ []) do
+    repo = PaperTrail.RepoClient.repo(options)
+    repo.get(
       ("Elixir." <> version.item_type) |> String.to_existing_atom(),
       version.item_id
     )
